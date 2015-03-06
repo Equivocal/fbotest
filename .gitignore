@@ -1,0 +1,29 @@
+# Compiled Object files
+*.slo
+*.lo
+*.o
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+
+# Compiled things
+bin/
+Debug/
+Release/
+
+# program logs
+*.log
+
+# project files
+*.depend
+*.opensdf
+*.suo
+*.sdf
+*.exe
