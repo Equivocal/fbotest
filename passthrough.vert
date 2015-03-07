@@ -1,4 +1,4 @@
-#version 400
+#version 330
 
 in vec2 VertexPosition;
 in vec2 texCoord;
@@ -12,5 +12,5 @@ uniform mat4 view;
 void main()
 {
 	texCoordV = texCoord;
-	gl_Position = projection*vec4( VertexPosition, 0.0, 1.0 );
+	gl_Position = projection*view*vec4( VertexPosition, 0.0, 1.0 );
 }

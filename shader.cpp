@@ -11,12 +11,18 @@ namespace nex {
 		const char* c_str = src.c_str();
 
 		this->m_shader = glCreateShader(shaderType);
+		if (m_shader == 0) {
+			printf("Error creating shader: %s\n", glewGetErrorString(glGetError()));
+		}
+		assert(glGetError() == GL_NO_ERROR);
 #ifdef _WIN32
 		glShaderSource(this->m_shader, 1, (const GLchar*const*)&c_str, NULL);
 #else
 		glShaderSource(this->m_shader, 1, &c_str, NULL);
+		assert(glGetError() == GL_NO_ERROR);
 #endif
 		glCompileShader(this->m_shader);
+		assert(glGetError() == GL_NO_ERROR);
 
 		GLint result;
 		glGetShaderiv(this->m_shader, GL_COMPILE_STATUS, &result);

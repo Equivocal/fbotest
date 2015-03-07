@@ -4,6 +4,7 @@
 #include <GL/glew.h>
 #include <string>
 #include <fstream>
+#include <cassert>
 
 namespace nex {
 	class Shader {

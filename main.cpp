@@ -1,146 +1,153 @@
+#define GLM_FORCE_RADIANS 
+
 #include <GL/glew.h>
-#include <GLFW/glfw3.h>
+#include <SDL.h>
+#include <SDL_opengl.h>
 #include <vector>
 #include <glm/mat4x4.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include "primitive.h"
-#include "shader.h"
+#include "glslprogram.h"
 
 GLuint m_occluderFBO, m_occluderTex, m_vbo;
-GLint m_handle, m_model, m_view, m_projection;
+GLint m_model[2], m_view[2], m_projection[2];
 
-nex::Shader m_vShader;
-nex::Shader m_fShader;
+nex::GlslProgram m_prog1;
+nex::GlslProgram m_prog2;
+
+nex::Shader m_vPassthrough;
+nex::Shader m_fPassthrough;
+nex::Shader m_vTex;
+nex::Shader m_fTex;
 
 std::vector<nex::Vertex> verts;
+std::vector<nex::Vertex> verts2;
 
 void setup();
 void draw();
 
 int main(void)
 {
-	GLFWwindow* window;
-
-	/* Initialize the library */
-	if (!glfwInit())
-		return -1;
-
-	/* Create a windowed mode window and its OpenGL context */
-	window = glfwCreateWindow(640, 480, "Hello World", NULL, NULL);
-	if (!window)
-	{
-		glfwTerminate();
-		return -1;
-	}
-
-	/* Make the window's context current */
-	glfwMakeContextCurrent(window);
+	SDL_Init( SDL_INIT_VIDEO );
+/*
+	SDL_GL_SetAttribute( SDL_GL_CONTEXT_MAJOR_VERSION, 3 );
+    SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, 3 );
+    SDL_GL_SetAttribute( SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE );	
+	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);*/
+	
+	SDL_Window *win = SDL_CreateWindow("Hello world!", 100, 100, 640, 480, SDL_WINDOW_OPENGL);
+    SDL_GLContext context = SDL_GL_CreateContext(win);
+    assert(glGetError() == GL_NO_ERROR);
 
 	setup();
 
+	SDL_Event event;
 	/* Loop until the user closes the window */
-	while (!glfwWindowShouldClose(window))
-	{
+	while (1) {
+		while (SDL_PollEvent( &event ))
+		{
+			switch (event.type) {
+				case SDL_QUIT:
+					SDL_Quit();
+					return 1;
+			}
+		}
+		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		glClear(GL_COLOR_BUFFER_BIT);
 		/* Render here */
 		draw();
 
-		/* Swap front and back buffers */
-		glfwSwapBuffers(window);
-
-		/* Poll for and process events */
-		glfwPollEvents();
+		SDL_GL_SwapWindow(win);
 	}
 
-	glfwTerminate();
 	return 0;
 }
 
+void initProgram(GLuint *handle, std::string& vertShader, std::string& fragShader) {
+
+}
+
 void setup() {
+	glewExperimental=GL_TRUE;
 	GLint err = glewInit();
+	printf("%i\n", glGetError());
+	if (err != GL_NO_ERROR) {
+		printf("%s\n", glewGetErrorString(err));
+		exit(1);
+	}
+	assert(glGetError() == GL_NO_ERROR);
+
+	glGenFramebuffers(1, &m_occluderFBO);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, m_occluderFBO);
 	glGenTextures(1, &m_occluderTex);
 	glBindTexture(GL_TEXTURE_2D, m_occluderTex);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 256, 256, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 640, 480, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
 	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-	glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_WIDTH, 256);
+	assert(glGetError() == GL_NO_ERROR);
+/*	glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_WIDTH, 256);
 	glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_HEIGHT, 256);
-	glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_SAMPLES, 4);
+	glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_SAMPLES, 4);*/
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_occluderTex, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+	m_prog1.create("passthrough.vert", "passthrough.frag");
+	m_prog2.create("passthrough.vert", "tex.frag");
 
-	m_vShader.create("passthrough.vert", GL_VERTEX_SHADER);
-	m_fShader.create("passthrough.frag", GL_FRAGMENT_SHADER);
+	m_view[0] = glGetUniformLocation(m_prog1.get(), "view");
+	m_model[0] = glGetUniformLocation(m_prog1.get(), "model");
+	m_projection[0] = glGetUniformLocation(m_prog1.get(), "projection");
 
-	m_handle = glCreateProgram();
-	if (m_handle == 0) {
-		printf("Error creating program object");
-		exit(1);
-	}
-
-	glAttachShader(m_handle, m_vShader.get());
-	glAttachShader(m_handle, m_fShader.get());
-
-	glBindAttribLocation(m_handle, 0, "vertexPosition");
-	glBindAttribLocation(m_handle, 1, "texCoord");
-
-	glLinkProgram(m_handle);
-
-	GLint texUnitLoc = glGetUniformLocation(m_handle, "texUnit");
-	glActiveTexture(GL_TEXTURE0);
-	glProgramUniform1i(m_handle, texUnitLoc, 0);
-
-	GLint status;
-	glGetProgramiv(m_handle, GL_LINK_STATUS, &status);
-	if (status == GL_FALSE) {
-		printf("Failed to link shader program!");
-		GLint logLen;
-		glGetProgramiv(m_handle, GL_INFO_LOG_LENGTH, &logLen);
-		if (logLen > 0) {
-			char* log = (char*)malloc(logLen);
-			GLsizei written;
-			glGetProgramInfoLog(m_handle, logLen, &written, log);
-			printf("Program log: \n%s", log);
-			free(log);
-		}
-	}
-	else {
-		glUseProgram(m_handle);
-	}
+	m_view[1] = glGetUniformLocation(m_prog2.get(), "view");
+	m_model[1] = glGetUniformLocation(m_prog2.get(), "model");
+	m_projection[1] = glGetUniformLocation(m_prog2.get(), "projection");
 	
-	GLuint vboHandles[1];
+	printf("Vendor: %s\n", glGetString(GL_VENDOR));
+    printf("Renderer: %s\n", glGetString(GL_RENDERER));
+    printf("Version: %s\n", glGetString(GL_VERSION));
+    printf("GLSL: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
+
+    GLuint vboHandles[1];
 	glGenBuffers(1, vboHandles);
 	m_vbo = vboHandles[0];
 
-	m_view = glGetUniformLocation(m_handle, "view");
-	m_model = glGetUniformLocation(m_handle, "model");
-	m_projection = glGetUniformLocation(m_handle, "projection");
+	glProgramUniformMatrix4fv(m_prog1.get(), m_projection[0], 1, false, glm::value_ptr(glm::ortho(0.0f, 256.0f, 256.0f, 0.0f)));
+	glProgramUniformMatrix4fv(m_prog1.get(), m_model[0], 1, false, glm::value_ptr(glm::mat4(1.0f)));
+	glProgramUniformMatrix4fv(m_prog1.get(), m_view[0], 1, false, glm::value_ptr(glm::translate(glm::mat4(1.0f), glm::vec3(-192.0f, -112.0f, 0.0f)) ));
 
-	verts.push_back({ glm::vec2(100.0, 150.0), glm::vec2(0.0, 1.0), 0.0f, -1, nex::GEO_DEFAULT });
-	verts.push_back({ glm::vec2(150.0, 150.0), glm::vec2(1.0, 1.0), 0.0f, -1, nex::GEO_DEFAULT });
-	verts.push_back({ glm::vec2(150.0, 100.0), glm::vec2(1.0, 0.0), 0.0f, -1, nex::GEO_DEFAULT });
-	verts.push_back({ glm::vec2(100.0, 100.0), glm::vec2(0.0, 0.0), 0.0f, -1, nex::GEO_DEFAULT });
+//glm::translate(glm::mat4(1.0f), glm::vec3(192.0f, 112.0f, 0.0f)
 
-	glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-	glBufferData(GL_ARRAY_BUFFER, sizeof(nex::Vertex)*verts.size(), &verts[0], GL_STATIC_DRAW);
+	glProgramUniformMatrix4fv(m_prog2.get(), m_projection[1], 1, false, glm::value_ptr(glm::ortho(0.0f, 640.0f, 480.0f, 0.0f)));
+	glProgramUniformMatrix4fv(m_prog2.get(), m_model[1], 1, false, glm::value_ptr(glm::mat4(1.0f)));
+	glProgramUniformMatrix4fv(m_prog2.get(), m_view[1], 1, false, glm::value_ptr(glm::mat4(1.0f)));
 
-	glUniformMatrix4fv(m_projection, 1, false, glm::value_ptr(glm::ortho(0.0f, 640.0f, 480.0f, 0.0f)));
-	glUniformMatrix4fv(m_model, 1, false, glm::value_ptr(glm::mat4(1.0f)));
-	glUniformMatrix4fv(m_view, 1, false, glm::value_ptr(glm::mat4(1.0f)));
+	verts.push_back({ glm::vec2(220.0, 160.0), glm::vec2(0.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
+	verts.push_back({ glm::vec2(240.0, 160.0), glm::vec2(1.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
+	verts.push_back({ glm::vec2(240.0, 140.0), glm::vec2(1.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
+	verts.push_back({ glm::vec2(220.0, 140.0), glm::vec2(0.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
+
+	verts2.push_back({ glm::vec2(320.0-128.0, 240.0+128.0), glm::vec2(0.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
+	verts2.push_back({ glm::vec2(320.0+128.0, 240.0+128.0), glm::vec2(1.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
+	verts2.push_back({ glm::vec2(320.0+128.0, 240.0-128.0), glm::vec2(1.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
+	verts2.push_back({ glm::vec2(320.0-128.0, 240.0-128.0), glm::vec2(0.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
+/*
+	verts2.push_back({ glm::vec2(0.0, 480.0), glm::vec2(0.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
+	verts2.push_back({ glm::vec2(640.0, 480.0), glm::vec2(1.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
+	verts2.push_back({ glm::vec2(640.0, 0.0), glm::vec2(1.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
+	verts2.push_back({ glm::vec2(0.0, 0.0), glm::vec2(0.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });*/
 }
 
 void draw() {
 	
-
 	glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-	
+	glBufferData(GL_ARRAY_BUFFER, sizeof(nex::Vertex)*verts.size(), &verts[0], GL_STREAM_DRAW);
 
 	// define the index array for the outputs
-	
+	m_prog1.use();
 
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
@@ -148,15 +155,18 @@ void draw() {
 	glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(nex::Vertex), reinterpret_cast<void*>(sizeof(glm::vec2)));
 
 	glBindFramebuffer(GL_FRAMEBUFFER, m_occluderFBO);
-	glClearColor(1.0, 1.0, 1.0, 1.0);
-	glClear(GL_COLOR_BUFFER_BIT);
-
 	GLuint attachments[1] = { GL_COLOR_ATTACHMENT0 };
 	glDrawBuffers(1, attachments);
 
+	glClearColor(1.0, 1.0, 1.0, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT);
 	glDrawArrays(GL_QUADS, 0, 4);
-	glBindFramebuffer(GL_FRAMEBUFFER, NULL);
 
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	glBufferData(GL_ARRAY_BUFFER, sizeof(nex::Vertex)*verts2.size(), &verts2[0], GL_STREAM_DRAW);
+
+	m_prog2.use();
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, m_occluderTex);
 	glClearColor(0.0, 0.0, 0.0, 1.0);
