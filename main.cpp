@@ -11,15 +11,19 @@
 #include "glslprogram.h"
 
 GLuint m_occluderFBO, m_occluderTex, m_vbo;
-GLint m_model[2], m_view[2], m_projection[2];
+GLuint m_shadowFBO, m_shadowTex;
+GLint m_model[4], m_view[4], m_projection[4];
 
 nex::GlslProgram m_prog1;
 nex::GlslProgram m_prog2;
+nex::GlslProgram m_prog3;
+nex::GlslProgram m_prog4;
 
 nex::Shader m_vPassthrough;
 nex::Shader m_fPassthrough;
 nex::Shader m_vTex;
 nex::Shader m_fTex;
+nex::Shader m_fShadows;
 
 std::vector<nex::Vertex> verts;
 std::vector<nex::Vertex> verts2;
@@ -79,6 +83,7 @@ void setup() {
 	assert(glGetError() == GL_NO_ERROR);
 
 	glGenFramebuffers(1, &m_occluderFBO);
+	glGenFramebuffers(1, &m_shadowFBO);
 
 	glBindFramebuffer(GL_FRAMEBUFFER, m_occluderFBO);
 	glGenTextures(1, &m_occluderTex);
@@ -95,8 +100,25 @@ void setup() {
 	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_occluderTex, 0);
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
+	glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFBO);
+	glGenTextures(1, &m_shadowTex);
+	glBindTexture(GL_TEXTURE_2D, m_shadowTex);
+	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 256, 1, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+	glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+	assert(glGetError() == GL_NO_ERROR);
+/*	glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_WIDTH, 256);
+	glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_HEIGHT, 256);
+	glFramebufferParameteri(GL_DRAW_FRAMEBUFFER, GL_FRAMEBUFFER_DEFAULT_SAMPLES, 4);*/
+	glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_shadowTex, 0);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
 	m_prog1.create("passthrough.vert", "passthrough.frag");
 	m_prog2.create("passthrough.vert", "tex.frag");
+	m_prog3.create("passthrough.vert", "polar.frag");
+	m_prog4.create("passthrough.vert", "shadows.frag");
 
 	m_view[0] = glGetUniformLocation(m_prog1.get(), "view");
 	m_model[0] = glGetUniformLocation(m_prog1.get(), "model");
@@ -105,6 +127,14 @@ void setup() {
 	m_view[1] = glGetUniformLocation(m_prog2.get(), "view");
 	m_model[1] = glGetUniformLocation(m_prog2.get(), "model");
 	m_projection[1] = glGetUniformLocation(m_prog2.get(), "projection");
+
+	m_view[2] = glGetUniformLocation(m_prog3.get(), "view");
+	m_model[2] = glGetUniformLocation(m_prog3.get(), "model");
+	m_projection[2] = glGetUniformLocation(m_prog3.get(), "projection");
+
+	m_view[3] = glGetUniformLocation(m_prog4.get(), "view");
+	m_model[3] = glGetUniformLocation(m_prog4.get(), "model");
+	m_projection[3] = glGetUniformLocation(m_prog4.get(), "projection");
 	
 	printf("Vendor: %s\n", glGetString(GL_VENDOR));
     printf("Renderer: %s\n", glGetString(GL_RENDERER));
@@ -119,26 +149,34 @@ void setup() {
 	glProgramUniformMatrix4fv(m_prog1.get(), m_model[0], 1, false, glm::value_ptr(glm::mat4(1.0f)));
 	glProgramUniformMatrix4fv(m_prog1.get(), m_view[0], 1, false, glm::value_ptr(glm::translate(glm::mat4(1.0f), glm::vec3(-192.0f, -112.0f, 0.0f)) ));
 
+	glProgramUniformMatrix4fv(m_prog3.get(), m_projection[2], 1, false, glm::value_ptr(glm::ortho(0.0f, 256.0f, 256.0f, 0.0f)));
+	glProgramUniformMatrix4fv(m_prog3.get(), m_model[2], 1, false, glm::value_ptr(glm::mat4(1.0f)));
+	glProgramUniformMatrix4fv(m_prog3.get(), m_view[2], 1, false, glm::value_ptr(glm::mat4(1.0f)));
+
 //glm::translate(glm::mat4(1.0f), glm::vec3(192.0f, 112.0f, 0.0f)
 
 	glProgramUniformMatrix4fv(m_prog2.get(), m_projection[1], 1, false, glm::value_ptr(glm::ortho(0.0f, 640.0f, 480.0f, 0.0f)));
 	glProgramUniformMatrix4fv(m_prog2.get(), m_model[1], 1, false, glm::value_ptr(glm::mat4(1.0f)));
 	glProgramUniformMatrix4fv(m_prog2.get(), m_view[1], 1, false, glm::value_ptr(glm::mat4(1.0f)));
 
+	glProgramUniformMatrix4fv(m_prog4.get(), m_projection[3], 1, false, glm::value_ptr(glm::ortho(0.0f, 256.0f, 256.0f, 0.0f)));
+	glProgramUniformMatrix4fv(m_prog4.get(), m_model[3], 1, false, glm::value_ptr(glm::mat4(1.0f)));
+	glProgramUniformMatrix4fv(m_prog4.get(), m_view[3], 1, false, glm::value_ptr(glm::mat4(1.0f)));
+
 	verts.push_back({ glm::vec2(220.0, 160.0), glm::vec2(0.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
 	verts.push_back({ glm::vec2(240.0, 160.0), glm::vec2(1.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
 	verts.push_back({ glm::vec2(240.0, 140.0), glm::vec2(1.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
 	verts.push_back({ glm::vec2(220.0, 140.0), glm::vec2(0.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
-
+/*
 	verts2.push_back({ glm::vec2(320.0-128.0, 240.0+128.0), glm::vec2(0.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
 	verts2.push_back({ glm::vec2(320.0+128.0, 240.0+128.0), glm::vec2(1.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
 	verts2.push_back({ glm::vec2(320.0+128.0, 240.0-128.0), glm::vec2(1.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
 	verts2.push_back({ glm::vec2(320.0-128.0, 240.0-128.0), glm::vec2(0.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
-/*
-	verts2.push_back({ glm::vec2(0.0, 480.0), glm::vec2(0.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
-	verts2.push_back({ glm::vec2(640.0, 480.0), glm::vec2(1.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
-	verts2.push_back({ glm::vec2(640.0, 0.0), glm::vec2(1.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
-	verts2.push_back({ glm::vec2(0.0, 0.0), glm::vec2(0.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });*/
+*/
+	verts2.push_back({ glm::vec2(0.0, 256.0), glm::vec2(0.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
+	verts2.push_back({ glm::vec2(256.0, 256.0), glm::vec2(1.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
+	verts2.push_back({ glm::vec2(256.0, 0.0), glm::vec2(1.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
+	verts2.push_back({ glm::vec2(0.0, 0.0), glm::vec2(0.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
 }
 
 void draw() {
@@ -162,14 +200,27 @@ void draw() {
 	glClear(GL_COLOR_BUFFER_BIT);
 	glDrawArrays(GL_QUADS, 0, 4);
 
+	m_prog3.use();
 	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	//glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFBO);
+	//glDrawBuffers(1, attachments);
+	glClearColor(0.0, 0.0, 0.0, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT);
 
 	glBufferData(GL_ARRAY_BUFFER, sizeof(nex::Vertex)*verts2.size(), &verts2[0], GL_STREAM_DRAW);
 
-	m_prog2.use();
 	glActiveTexture(GL_TEXTURE0);
 	glBindTexture(GL_TEXTURE_2D, m_occluderTex);
 	glClearColor(0.0, 0.0, 0.0, 1.0);
 	glClear(GL_COLOR_BUFFER_BIT);
 	glDrawArrays(GL_QUADS, 0, 4);
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+/*
+	m_prog4.use();
+	glActiveTexture(GL_TEXTURE0);
+	glBindTexture(GL_TEXTURE_2D, m_shadowTex);
+	glClearColor(0.0, 0.0, 0.0, 1.0);
+	glClear(GL_COLOR_BUFFER_BIT);
+	glDrawArrays(GL_QUADS, 0, 4);*/
 }
