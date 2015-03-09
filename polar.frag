@@ -19,8 +19,8 @@ void main(void) {
 
   for (float y=0.0; y<480.0; y+=1.0) {
         //rectangular to polar filter
-        vec2 norm = vec2(texCoordV.x, y/480.0) * 2.0 - 1.0;
-        float theta = PI*1.5 + norm.x * PI; 
+        vec2 norm = vec2(texCoordV.x, y/480.0) * 2.0 - vec2(1.0);
+        float theta = norm.x * 2.0*PI;
         float r = (1.0 + norm.y) * 0.5;
 
         //coord which we will sample from occlude map
@@ -35,7 +35,7 @@ void main(void) {
         //if we've hit an opaque fragment (occluder), then get new distance
         //if the new distance is below the current, then we'll use that for our ray
         float caster = data.r;
-        if (caster < THRESHOLD) {
+        if (caster > THRESHOLD) {
             distance = min(distance, dst);
             //NOTE: we could probably use "break" or "return" here
         }

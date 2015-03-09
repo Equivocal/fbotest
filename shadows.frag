@@ -17,18 +17,28 @@ float sample(vec2 coord, float r) {
 }
 
 void main(void) {
-    //rectangular to polar
-    vec2 norm = texCoordV * 2.0 - 1.0;
+    // centering on screen center
+    vec2 norm = texCoordV*2.0 - vec2(1.0,1.0);
     float theta = atan(norm.y, norm.x);
     float r = length(norm); 
-    float coord = (theta + PI) / (2.0*PI);
+    float coord = (theta) / (PI*2.5);
+/*
+    if (coord < 0.0) {
+        coord = coord + 1.0;
+    }
+*/
+    coord = 1.0 - coord;
+
+    //fragColor = vec4(coord, coord, coord, 1.0);
 
     //the tex coord to sample our 1D lookup texture 
     //always 0.0 on y axis
     vec2 tc = vec2(coord, 0.0);
 
     //the center tex coord, which gives us hard shadows
-    float center = sample(tc, r);        
+    float center = sample(tc, r);  
+
+    fragColor = vec4(vec3(center), 1.0);      
 
     //we multiply the blur amount by our distance from center
     //this leads to more blurriness as the shadow "fades away"
@@ -53,5 +63,5 @@ void main(void) {
 
     //multiply the summed amount by our distance, which gives us a radial falloff
     //then multiply by vertex (light) color  
-    fragColor = vec4(1.0, 1.0, 1.0, 1.0) * vec4(vec3(1.0), sum * smoothstep(1.0, 0.0, r));
+    fragColor = vec4(1.0, 0.0, 0.0, 1.0) * vec4(sum * smoothstep(1.0, 0.0, r));
 }
