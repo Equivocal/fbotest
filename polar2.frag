@@ -5,14 +5,15 @@
 in vec2 texCoordV;
 
 uniform sampler2D texUnit;
+uniform vec2 winsize;
 
 out vec4 fragColor;
 
 void main(void) {
     float distance = 1.0;
 
-    for (float y = 0.0; y <= 256.0; y+=1.0) {
-        float r = 1.0-y/256.0;
+    for (float y = 0.0; y <= winsize.y; y+=1.0) {
+        float r = 1.0-y/winsize.y;
         float theta = 2.0*PI*texCoordV.x;
 
         vec2 coords = vec2((1.0 + r*cos(theta))/2.0, (1.0 + r*sin(theta))/2.0);
