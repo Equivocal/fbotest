@@ -8,6 +8,7 @@
 #undef main
 #include <SDL_opengl.h>
 #include <vector>
+#include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_transform.hpp>
@@ -22,6 +23,8 @@ namespace nex {
 		GLuint m_polarFBO, m_polarTex;
 		GLint m_model[5], m_view[5], m_projection[5];
 		GLint m_windowSize[2];
+
+		glm::vec2 m_screenSize;
 
 		nex::GlslProgram m_prog1;
 		nex::GlslProgram m_prog2;

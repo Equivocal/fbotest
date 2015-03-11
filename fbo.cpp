@@ -8,8 +8,9 @@ namespace nex {
 			SDL_GL_SetAttribute( SDL_GL_CONTEXT_MINOR_VERSION, 3 );
 			SDL_GL_SetAttribute( SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE );
 			SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 16);*/
+		m_screenSize = glm::vec2(640.0, 480.0);
 
-		SDL_Window *win = SDL_CreateWindow("Hello world!", 100, 100, 256, 256, SDL_WINDOW_OPENGL);
+		SDL_Window *win = SDL_CreateWindow("Hello world!", 100, 100, m_screenSize.x, m_screenSize.y, SDL_WINDOW_OPENGL);
 		SDL_GLContext context = SDL_GL_CreateContext(win);
 		assert(glGetError() == GL_NO_ERROR);
 
@@ -119,7 +120,7 @@ namespace nex {
 		m_view[1] = glGetUniformLocation(m_prog2.get(), "view");
 		m_model[1] = glGetUniformLocation(m_prog2.get(), "model");
 		m_projection[1] = glGetUniformLocation(m_prog2.get(), "projection");
-		m_windowSize[0] = glGetUniformLocation(m_prog3.get(), "winsize");
+		m_windowSize[0] = glGetUniformLocation(m_prog2.get(), "winsize");
 
 		m_view[2] = glGetUniformLocation(m_prog3.get(), "view");
 		m_model[2] = glGetUniformLocation(m_prog3.get(), "model");
@@ -143,31 +144,38 @@ namespace nex {
 		glGenBuffers(1, vboHandles);
 		m_vbo = vboHandles[0];
 
-		glm::vec2 screenSize = glm::vec2(256.0, 256.0);
-		glm::vec2 lightPos = glm::vec2(128.0, 128.0);
-		glm::vec2 occluderPos = glm::vec2(80.0, 80.0);
-		glm::vec2 occluderPos2 = glm::vec2(256.0 - 100.0, 256.0 - 100.0);
+		glm::vec2 lightSize = glm::vec2(256.0, 256.0);
+		glm::vec2 lightPos = glm::vec2(300.0f, 300.0f);//m_screenSize / 2.0f;
+		glm::vec2 occluderPos = m_screenSize/2.0f - glm::vec2(40.0f, 40.0f);
+		glm::vec2 occluderPos2 = m_screenSize / 2.0f + glm::vec2(20.0f, 20.0f);
 		glm::vec2 occluderSize = glm::vec2(20.0, 20.0);
 
-		glProgramUniformMatrix4fv(m_prog1.get(), m_projection[0], 1, false, glm::value_ptr(glm::ortho(0.0f, screenSize.x, screenSize.y, 0.0f)));
+		glm::mat4 test_orthoProj = glm::ortho(0.0f, lightSize.x, lightSize.y, 0.0f);
+		glm::mat4 test_translation = glm::translate(glm::mat4(1.0f), glm::vec3(-lightPos + lightSize / 2.0f, 0.0f));
+		glm::vec4 test_transPos = test_translation*glm::vec4(occluderPos, 0.0f, 1.0f);
+		glm::vec4 test_transPos2 = test_translation*glm::vec4(occluderPos2, 0.0f, 1.0f);
+		printf("%f %f => %f %f\n", occluderPos.x, occluderPos.y, test_transPos.x, test_transPos.y);
+		printf("%f %f => %f %f\n", occluderPos2.x, occluderPos2.y, test_transPos2.x, test_transPos2.y);		
+
+		glProgramUniformMatrix4fv(m_prog1.get(), m_projection[0], 1, false, glm::value_ptr(glm::ortho(0.0f, lightSize.x, lightSize.y, 0.0f)));
 		glProgramUniformMatrix4fv(m_prog1.get(), m_model[0], 1, false, glm::value_ptr(glm::mat4(1.0f)));
-		glProgramUniformMatrix4fv(m_prog1.get(), m_view[0], 1, false, glm::value_ptr(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f))));
+		glProgramUniformMatrix4fv(m_prog1.get(), m_view[0], 1, false, glm::value_ptr(glm::translate(glm::mat4(1.0f), glm::vec3(-lightPos + lightSize / 2.0f, 0.0f))));
 
-		glProgramUniformMatrix4fv(m_prog3.get(), m_projection[2], 1, false, glm::value_ptr(glm::ortho(0.0f, 256.0f, 1.0f, 0.0f)));
-		glProgramUniformMatrix4fv(m_prog3.get(), m_model[2], 1, false, glm::value_ptr(glm::mat4(1.0f)));
-		glProgramUniformMatrix4fv(m_prog3.get(), m_view[2], 1, false, glm::value_ptr(glm::mat4(1.0f)));
-		glProgramUniform2fv(m_prog3.get(), m_windowSize[1], 1, glm::value_ptr(screenSize));
-
-		glProgramUniformMatrix4fv(m_prog2.get(), m_projection[1], 1, false, glm::value_ptr(glm::ortho(0.0f, screenSize.x, screenSize.y, 0.0f)));
+		glProgramUniformMatrix4fv(m_prog2.get(), m_projection[1], 1, false, glm::value_ptr(glm::ortho(0.0f, lightSize.x, lightSize.y, 0.0f)));
 		glProgramUniformMatrix4fv(m_prog2.get(), m_model[1], 1, false, glm::value_ptr(glm::mat4(1.0f)));
 		glProgramUniformMatrix4fv(m_prog2.get(), m_view[1], 1, false, glm::value_ptr(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f))));
-		glProgramUniform2fv(m_prog2.get(), m_windowSize[0], 1, glm::value_ptr(screenSize));
+		glProgramUniform2fv(m_prog2.get(), m_windowSize[0], 1, glm::value_ptr(lightSize));
 
-		glProgramUniformMatrix4fv(m_prog4.get(), m_projection[3], 1, false, glm::value_ptr(glm::ortho(0.0f, screenSize.x, screenSize.y, 0.0f)));
+		glProgramUniformMatrix4fv(m_prog3.get(), m_projection[2], 1, false, glm::value_ptr(glm::ortho(0.0f, lightSize.x, 1.0f, 0.0f)));
+		glProgramUniformMatrix4fv(m_prog3.get(), m_model[2], 1, false, glm::value_ptr(glm::mat4(1.0f)));
+		glProgramUniformMatrix4fv(m_prog3.get(), m_view[2], 1, false, glm::value_ptr(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f))));
+		glProgramUniform2fv(m_prog3.get(), m_windowSize[1], 1, glm::value_ptr(lightSize));
+
+		glProgramUniformMatrix4fv(m_prog4.get(), m_projection[3], 1, false, glm::value_ptr(glm::ortho(0.0f, m_screenSize.x, m_screenSize.y, 0.0f)));
 		glProgramUniformMatrix4fv(m_prog4.get(), m_model[3], 1, false, glm::value_ptr(glm::mat4(1.0f)));
 		glProgramUniformMatrix4fv(m_prog4.get(), m_view[3], 1, false, glm::value_ptr(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f))));
 
-		glProgramUniformMatrix4fv(m_prog5.get(), m_projection[4], 1, false, glm::value_ptr(glm::ortho(0.0f, screenSize.x, screenSize.y, 0.0f)));
+		glProgramUniformMatrix4fv(m_prog5.get(), m_projection[4], 1, false, glm::value_ptr(glm::ortho(0.0f, m_screenSize.x, m_screenSize.y, 0.0f)));
 		glProgramUniformMatrix4fv(m_prog5.get(), m_model[4], 1, false, glm::value_ptr(glm::mat4(1.0f)));
 		glProgramUniformMatrix4fv(m_prog5.get(), m_view[4], 1, false, glm::value_ptr(glm::translate(glm::mat4(1.0f), glm::vec3(0.0f))));
 
@@ -185,40 +193,46 @@ namespace nex {
 			verts2.push_back({ glm::vec2(320.0+128.0, 240.0-128.0), glm::vec2(1.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
 			verts2.push_back({ glm::vec2(320.0-128.0, 240.0-128.0), glm::vec2(0.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
 			*/
-		verts2.push_back({ glm::vec2(0.0, 256.0), glm::vec2(0.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
-		verts2.push_back({ glm::vec2(256.0, 256.0), glm::vec2(1.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
+		verts2.push_back({ glm::vec2(0.0, 1.0), glm::vec2(0.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
+		verts2.push_back({ glm::vec2(256.0, 1.0), glm::vec2(1.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
 		verts2.push_back({ glm::vec2(256.0, 0.0), glm::vec2(1.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
 		verts2.push_back({ glm::vec2(0.0, 0.0), glm::vec2(0.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
 
-		verts4.push_back({ glm::vec2(0.0, 256.0), glm::vec2(0.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
-		verts4.push_back({ glm::vec2(256.0, 256.0), glm::vec2(1.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
-		verts4.push_back({ glm::vec2(256.0, 246.0), glm::vec2(1.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
-		verts4.push_back({ glm::vec2(0.0, 246.0), glm::vec2(0.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
+		verts4.push_back({ glm::vec2(0.0f, 256.0f), glm::vec2(0.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
+		verts4.push_back({ glm::vec2(256.0f, 256.0f), glm::vec2(1.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
+		verts4.push_back({ glm::vec2(256.0, 0.0f), glm::vec2(1.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
+		verts4.push_back({ glm::vec2(0.0f, 0.0f), glm::vec2(0.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
 
-		verts3.push_back({ glm::vec2(lightPos.x - 128.0f, lightPos.y + 128.0f), glm::vec2(0.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
-		verts3.push_back({ glm::vec2(lightPos.x + 128.0f, lightPos.y + 128.0f), glm::vec2(1.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
-		verts3.push_back({ glm::vec2(lightPos.x + 128.0f, lightPos.y - 128.0f), glm::vec2(1.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
-		verts3.push_back({ glm::vec2(lightPos.x - 128.0f, lightPos.y - 128.0f), glm::vec2(0.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
+		verts3.push_back({ glm::vec2(lightPos.x - lightSize.x / 2.0f, lightPos.y + lightSize.y / 2.0f), glm::vec2(0.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
+		verts3.push_back({ glm::vec2(lightPos.x + lightSize.x / 2.0f, lightPos.y + lightSize.y / 2.0f), glm::vec2(1.0, 1.0), 0.0f, 0, nex::GEO_DEFAULT });
+		verts3.push_back({ glm::vec2(lightPos.x + lightSize.x / 2.0f, lightPos.y - lightSize.y / 2.0f), glm::vec2(1.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
+		verts3.push_back({ glm::vec2(lightPos.x - lightSize.x / 2.0f, lightPos.y - lightSize.y / 2.0f), glm::vec2(0.0, 0.0), 0.0f, 0, nex::GEO_DEFAULT });
 	}
+
 
 	void FBO::draw() {
 
 		glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-		glBufferData(GL_ARRAY_BUFFER, sizeof(nex::Vertex)*verts.size(), &verts[0], GL_STREAM_DRAW);
 
-		// define the index array for the outputs
-		m_prog1.use();
+		// *** PROG 1 - Draw occluders from light's viewpoint
+		glBufferData(GL_ARRAY_BUFFER, sizeof(nex::Vertex)*verts.size(), &verts[0], GL_STREAM_DRAW);
+		m_prog1.use();		
 
 		glEnableVertexAttribArray(0);
 		glEnableVertexAttribArray(1);
 		glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, sizeof(nex::Vertex), 0);
 		glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, sizeof(nex::Vertex), reinterpret_cast<void*>(sizeof(glm::vec2)));
 
+		GLuint attachments[1] = { GL_COLOR_ATTACHMENT0 };
+
 		if (m_state > 0) {
 			glBindFramebuffer(GL_FRAMEBUFFER, m_occluderFBO);
+			glDrawBuffers(1, attachments);
+			glViewport(0, 0, 256, 256);
 		}
-		GLuint attachments[1] = { GL_COLOR_ATTACHMENT0 };
-		glDrawBuffers(1, attachments);
+		else {
+			glViewport(0, 0, m_screenSize.x, m_screenSize.y);
+		}
 
 		glClearColor(0.0, 0.0, 0.0, 1.0);
 		glClear(GL_COLOR_BUFFER_BIT);
@@ -226,13 +240,16 @@ namespace nex {
 
 		if (m_state == 0)
 			return;
+		// *** END PROG 1
 
 		//// TEMP
 		if (m_state == 1) {
-			m_prog2.use();
-
-			glBufferData(GL_ARRAY_BUFFER, sizeof(nex::Vertex)*verts2.size(), &verts2[0], GL_STREAM_DRAW);
+			m_prog2.use();			
+			glBufferData(GL_ARRAY_BUFFER, sizeof(nex::Vertex)*verts4.size(), &verts4[0], GL_STREAM_DRAW);
 			glBindFramebuffer(GL_FRAMEBUFFER, 0);
+			glViewport(0, 0, m_screenSize.x, m_screenSize.y);
+			glClearColor(1.0f, 1.0f, 1.0f, 1.0f);
+			glClear(GL_COLOR_BUFFER_BIT);
 			glActiveTexture(GL_TEXTURE0);
 			glBindTexture(GL_TEXTURE_2D, m_occluderTex);
 			glDrawArrays(GL_QUADS, 0, 4);
@@ -247,6 +264,7 @@ namespace nex {
 		}
 		else {
 			glBindFramebuffer(GL_FRAMEBUFFER, m_shadowFBO);
+			glViewport(0, 0, 256, 1);
 		}
 
 		glDrawBuffers(1, attachments);
@@ -261,6 +279,7 @@ namespace nex {
 		glClear(GL_COLOR_BUFFER_BIT);
 		glDrawArrays(GL_QUADS, 0, 4);
 		glBindFramebuffer(GL_FRAMEBUFFER, 0);
+		glViewport(0, 0, m_screenSize.x, m_screenSize.y);
 
 		if (m_state == 2)
 			return;

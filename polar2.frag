@@ -17,6 +17,7 @@ void main(void) {
         float theta = 2.0*PI*texCoordV.x;
 
         vec2 coords = vec2((1.0 + r*cos(theta))/2.0, (1.0 + r*sin(theta))/2.0);
+
         //vec2 coord = vec2(r, theta/(2.0*PI));
 
         vec4 data = texture(texUnit, coords);
